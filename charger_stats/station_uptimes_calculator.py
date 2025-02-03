@@ -27,16 +27,17 @@ class StationUptimeCalculationState:
 def parse(arguments: List[str]):
     parser = argparse.ArgumentParser(description='Calculate station uptimes.')
 
-    parser.add_argument('reports_relative_file_path',
-                        metavar='Charger uptime reports relative file path.', 
+    reports_relative_path = 'reports_relative_file_path'
+    parser.add_argument(reports_relative_path,
+                        metavar= reports_relative_path, 
                         type=str,
                         help='Relative path to charger uptime reports file. <file format requirements here>')
 
     try:
         parsed_arguments = parser.parse_args(arguments)
-    except Exception as e:
+    except SystemExit as s:
         print('ERROR')
-        raise e
+        raise s
 
     return parsed_arguments
 
