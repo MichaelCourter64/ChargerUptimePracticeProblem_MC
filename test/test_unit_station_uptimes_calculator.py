@@ -1,5 +1,4 @@
 from io import StringIO
-from typing import List
 import unittest
 from unittest.mock import patch
 import charger_stats.station_uptimes_calculator as uptimes_calculator
