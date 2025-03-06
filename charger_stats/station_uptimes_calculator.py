@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 import math
 import sys
-import os
 import traceback
 from typing import Dict, List
 
@@ -27,11 +26,11 @@ class StationUptimeCalculationState:
 def parse(arguments: List[str]):
     parser = argparse.ArgumentParser(description='Calculate station uptimes.')
 
-    reports_relative_path = 'reports_relative_file_path'
-    parser.add_argument(reports_relative_path,
-                        metavar= reports_relative_path, 
+    reports_path = 'reports_file_path'
+    parser.add_argument(reports_path,
+                        metavar= reports_path, 
                         type=str,
-                        help='Relative path to charger uptime reports file. <file format requirements here>')
+                        help='Path to charger uptime reports file. <file format requirements here>')
 
     try:
         parsed_arguments = parser.parse_args(arguments)
@@ -146,7 +145,7 @@ def main():
 
     # Read all text from the file
     try:
-        with open(os.path.join(os.getcwd(), parsed_arguments.reports_relative_file_path), 'r') as file:
+        with open(parsed_arguments.reports_file_path, 'r') as file:
             lines = file.readlines()
     except Exception as e:
         print('ERROR')
