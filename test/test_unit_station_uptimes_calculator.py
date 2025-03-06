@@ -13,9 +13,10 @@ class Test_StationUptimesCalculator(unittest.TestCase):
     universal_std_error_message = 'ERROR\n'
     valid_path = 'test/input_1.txt'
 
-    def test__parse__charger_uptime_reports_relative_file_path__success(self):
+
+    def test__parse__charger_uptime_reports_file_path__success(self):
         parsed_arguments = uptimes_calculator.parse([self.valid_path])
-        self.assertEqual(parsed_arguments.reports_relative_file_path, self.valid_path)
+        self.assertEqual(parsed_arguments.reports_file_path, self.valid_path)
     
     @patch('sys.stderr', new_callable=StringIO)
     @patch('sys.stdout', new_callable=StringIO)
@@ -27,8 +28,8 @@ class Test_StationUptimesCalculator(unittest.TestCase):
         err_message_lines = mock_stderr.getvalue().splitlines()
 
         self.assertEqual(out_message, self.universal_std_error_message)
-        self.assertIn('[-h] reports_relative_file_path', err_message_lines[0])
-        self.assertIn('error: the following arguments are required: reports_relative_file_path', err_message_lines[1])
+        self.assertIn('[-h] reports_file_path', err_message_lines[0])
+        self.assertIn('error: the following arguments are required: reports_file_path', err_message_lines[1])
 
     @patch('sys.stderr', new_callable=StringIO)
     @patch('sys.stdout', new_callable=StringIO)
