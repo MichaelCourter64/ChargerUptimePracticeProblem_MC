@@ -7,8 +7,6 @@ import sys
 import traceback
 from typing import Dict, List
 
-# type OneToManyIds = Dict[int, int]
-
 @dataclass
 class ChargerReport:
     charger_id: int
