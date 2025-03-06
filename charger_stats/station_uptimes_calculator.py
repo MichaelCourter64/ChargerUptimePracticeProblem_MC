@@ -83,11 +83,21 @@ def parse_charger_text_reports(text_lines: List[str]) -> tuple[Dict[int, int], L
     return chargers_to_stations, charger_reports
 
 def validate_station_ids_in_reports(chargers_to_stations: Dict[int, int], charger_reports: List[ChargerReport]) -> tuple[bool, List[int]]:
+    """
+    Validates that all charger ids in charger_reports exist in chargers_to_stations.
+
+    Returns:
+        (bool, List[int]): 
+            True if all charger ids in charger_reports exist in chargers_to_stations.
+
+            A list of charger ids that do not exist in chargers_to_stations.
+    """
+
     isValid = True
     missing_station_ids = []
 
     for report in charger_reports:
-        # Use exception handling to run in O(1) time vs 'key in dict' for O(n)
+        # Using exception handling to run in O(1) time vs 'key in dict' for O(n) time
         try:
             chargers_to_stations[report.charger_id]
         except KeyError:
