@@ -22,6 +22,48 @@ class StationUptimeCalculationState:
     available_time: int
 
 def parse(arguments: List[str]):
+class NoStationsSectionError(Exception):
+    pass
+class EmptyStationsSectionError(Exception):
+    pass
+
+class NoChargerReportsSectionError(Exception):
+    pass
+class EmptyChargerReportsSectionError(Exception):
+    pass
+
+class InvalidChargerReportValueError(ValueError):
+    """
+    Base Error customization based on:
+    https://stackoverflow.com/questions/1319615/proper-way-to-declare-custom-exceptions-in-modern-python/26938914#26938914
+    """
+    def __init__(self, data_field: str, text_line: str, invalid_value: str, *args):
+        self.data_field = data_field
+        message = f'The data field={data_field} in the text line list at index={text_line} has an invalid value={invalid_value}.'  
+        
+        # allow users initialize misc. arguments as any other builtin Error
+        super(InvalidChargerReportValueError, self).__init__(message, *args)
+
+class TimeLineError(Exception):
+    def __init__(self, message: str, *args):
+        # allow users initialize misc. arguments as any other builtin Error
+        super(TimeLineError, self).__init__(message, *args)
+
+    @classmethod
+    def from_non_existent_station_timeline(cls, station_id: int, *args):
+        message = f'The timeline of the station that owns charger id={station_id}, does not exist. Its earliest time is equal to its latest.'
+        return cls(message, *args)
+    
+    @classmethod
+    def from_charger_report_inverted_timeline(cls, charger_id: int, start_time: int, end_time: int, *args):
+        message = f'The timeline of a report with charger id={charger_id}, is inverted: start={start_time}, end={end_time}'
+        return cls(message, *args)
+    
+    @classmethod
+    def from_charger_report_infinite_timeline(cls, charger_id: int, start_time: int, end_time: int, *args):
+        message = f'The timeline of the report with id={charger_id}, is infinite: start={start_time}, end={end_time}'
+        return cls(message, *args)
+
     parser = argparse.ArgumentParser(description='Calculate station uptimes.')
 
     reports_path = 'reports_file_path'
@@ -45,40 +87,63 @@ def parse_charger_text_reports(text_lines: List[str]) -> tuple[Dict[int, int], L
     
     try:
         # Find index of the line containing '[Stations]' using generator expression
-        station_section_index = next(i for i, line in enumerate(text_lines) if '[Stations]' in line)
+        station_section_index = next(i for i, line in enumerate(text_lines) if '[Stations]\n' == line)
     except StopIteration:
-        print('ERROR')
-        print('Error: [Stations] section not found in report text.', file=sys.stderr)
-        sys.exit(1)
+        raise NoStationsSectionError
     
     line_index = station_section_index + 1
     while line_index < len(text_lines) and not text_lines[line_index].isspace():
         station_entry_list = text_lines[line_index].split()
-        station_id = int(station_entry_list[0])
-        station_charger_ids = [int(charger_id) for charger_id in station_entry_list[1:]]
+
+        try:
+            station_id = int(station_entry_list[0])
+        except ValueError:
+            raise InvalidChargerReportValueError('station_id', line_index, station_entry_list[0])
+        
+        try:
+            station_charger_ids = [int(charger_id) for charger_id in station_entry_list[1:]]
+        except ValueError:
+            raise InvalidChargerReportValueError('charger_id', line_index, charger_id)
         
         for charger_id in station_charger_ids:
             chargers_to_stations[charger_id] = station_id
 
         line_index += 1
     
-    # Find index of the line containing '[Charger Availability Reports]' using generator expression
+    if chargers_to_stations == {}:
+        raise EmptyStationsSectionError
+
     try:
-        charger_section_index = next(i for i, line in enumerate(text_lines) if '[Charger Availability Reports]' in line)
+        charger_section_index = next(i for i, line in enumerate(text_lines) if '[Charger Availability Reports]\n' == line)
     except StopIteration:
-        print('ERROR')
-        print('Error: [Charger Availability Reports] section not found in report text.', file=sys.stderr)
-        sys.exit(1)
+        raise NoChargerReportsSectionError
     
     line_index = charger_section_index + 1
     while line_index < len(text_lines) and not text_lines[line_index].isspace():
         charger_entry_list = text_lines[line_index].split()
-        charger_id = int(charger_entry_list[0])
-        charger_start_time = int(charger_entry_list[1])
-        charger_end_time = int(charger_entry_list[2])
+
+        try:
+            charger_id = int(charger_entry_list[0])
+        except ValueError:
+            raise InvalidChargerReportValueError('charger_id', line_index, charger_entry_list[0])
+
+        try:
+            charger_start_time = int(charger_entry_list[1])
+        except ValueError:
+            raise InvalidChargerReportValueError('charger_start_time', line_index, charger_entry_list[1])
+
+        try:
+            charger_end_time = int(charger_entry_list[2])
+        except ValueError:
+            raise InvalidChargerReportValueError('charger_end_time', line_index, charger_entry_list[2])
+
         charger_availability = charger_entry_list[3] == 'true'
+        
         charger_reports.append(ChargerReport(charger_id, charger_start_time, charger_end_time, charger_availability))
         line_index += 1
+
+    if charger_reports == []:
+        raise EmptyChargerReportsSectionError
 
     return chargers_to_stations, charger_reports
 
