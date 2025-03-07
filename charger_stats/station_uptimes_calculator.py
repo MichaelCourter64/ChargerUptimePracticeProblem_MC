@@ -172,7 +172,14 @@ def validate_station_ids_in_reports(chargers_to_stations: Dict[int, int], charge
     return isValid, missing_station_ids
 
 def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_reports: List[ChargerReport]) -> List[{int, int}]:
+    """
+    Calculate charger station uptimes based on charger availability reports.
 
+    Raises:
+        KeyError: Charger id not found in chargers_to_stations.
+        TimeLineError: A report or station's timeline is invalid.
+    """
+    # TODO: find other exceptions worth documenting
     station_uptime_calculations: Dict[int, StationUptimeCalculationState] = {}
     uptimes = []
 
@@ -185,7 +192,6 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
     for station in chargers_to_stations.values():
         station_uptime_calculations[station] = StationUptimeCalculationState(sys.maxsize, 0, float('-inf'), 0)
 
-    # Sorted list of charger reports
     sorted_charger_reports = sorted(charger_reports, key=lambda r: r.start_time)
 
     # Iterate through the sorted list of charger reports and find the earliest start time and latest end time for each station
@@ -198,10 +204,12 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
         if report.end_time > station_uptime_calculations[station_id].latest_charger_end_time:
             station_uptime_calculations[station_id].latest_charger_end_time = report.end_time
 
+    # Validate charger timelines to prevent ZeroDivisionError when calculating uptime percentage
     for id, station_calculation in station_uptime_calculations.items():
         if station_calculation.earliest_charger_start_time == station_calculation.latest_charger_end_time:
             raise TimeLineError.from_non_existent_station_timeline(id)
 
+    # Calculate each station's uptime
     for report in sorted_charger_reports:
         if report.charger_available:
             station_id = chargers_to_stations[report.charger_id]
@@ -214,6 +222,7 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
                 station_uptime_calculations[station_id].available_time += report.end_time - station_uptime_calculations[station_id].calculation_time
                 station_uptime_calculations[station_id].calculation_time = report.end_time
     
+    # Calculate each station's simplified uptime percentage
     for id, station_calculation in station_uptime_calculations.items():
         uptime_decimal_percentage = station_calculation.available_time / (station_calculation.latest_charger_end_time - station_calculation.earliest_charger_start_time)
         uptime_simplified_percentage = math.trunc(uptime_decimal_percentage * 100)
