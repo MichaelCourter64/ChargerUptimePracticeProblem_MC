@@ -172,12 +172,18 @@ def validate_station_ids_in_reports(chargers_to_stations: Dict[int, int], charge
     return isValid, missing_station_ids
 
 def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_reports: List[ChargerReport]) -> List[{int, int}]:
+
+    station_uptime_calculations: Dict[int, StationUptimeCalculationState] = {}
     uptimes = []
 
-    # Dictionary of station ids to StationUptimeCalculationState
-    station_uptime_calculations: Dict[int, StationUptimeCalculationState] = {}
+    for report in charger_reports:
+        if report.start_time > report.end_time:
+            raise TimeLineError.from_charger_report_inverted_timeline(report.charger_id, report.start_time, report.end_time)
+        if report.start_time == float('-inf') or report.start_time == float('inf') or report.end_time == float('-inf') or report.end_time == float('inf'):
+            raise TimeLineError.from_charger_report_infinite_timeline(report.charger_id, report.start_time, report.end_time)
+
     for station in chargers_to_stations.values():
-        station_uptime_calculations[station] = StationUptimeCalculationState(sys.maxsize, 0, 0, 0)
+        station_uptime_calculations[station] = StationUptimeCalculationState(sys.maxsize, 0, float('-inf'), 0)
 
     # Sorted list of charger reports
     sorted_charger_reports = sorted(charger_reports, key=lambda r: r.start_time)
@@ -188,8 +194,13 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
 
         if report.start_time < station_uptime_calculations[station_id].earliest_charger_start_time:
             station_uptime_calculations[station_id].earliest_charger_start_time = report.start_time
+        
         if report.end_time > station_uptime_calculations[station_id].latest_charger_end_time:
             station_uptime_calculations[station_id].latest_charger_end_time = report.end_time
+
+    for id, station_calculation in station_uptime_calculations.items():
+        if station_calculation.earliest_charger_start_time == station_calculation.latest_charger_end_time:
+            raise TimeLineError.from_non_existent_station_timeline(id)
 
     for report in sorted_charger_reports:
         if report.charger_available:
@@ -198,11 +209,16 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
             if report.start_time >= station_uptime_calculations[station_id].calculation_time:
                 station_uptime_calculations[station_id].available_time += report.end_time - report.start_time
                 station_uptime_calculations[station_id].calculation_time = report.end_time
-            else:
+
+            elif report.end_time > station_uptime_calculations[station_id].calculation_time:
                 station_uptime_calculations[station_id].available_time += report.end_time - station_uptime_calculations[station_id].calculation_time
+                station_uptime_calculations[station_id].calculation_time = report.end_time
     
     for id, station_calculation in station_uptime_calculations.items():
-        uptimes.append((id, math.trunc(station_calculation.available_time / (station_calculation.latest_charger_end_time - station_calculation.earliest_charger_start_time) * 100)))
+        uptime_decimal_percentage = station_calculation.available_time / (station_calculation.latest_charger_end_time - station_calculation.earliest_charger_start_time)
+        uptime_simplified_percentage = math.trunc(uptime_decimal_percentage * 100)
+
+        uptimes.append((id, uptime_simplified_percentage))
 
     return uptimes
 

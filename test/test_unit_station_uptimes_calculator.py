@@ -84,15 +84,235 @@ class Test_StationUptimesCalculator(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertEqual(missing_station_ids, [])
 
-    '''def test_parse_given_number_instead_of_file_path(self):
-        with self.assertRaises(SystemExit):
-            uptimes_calculator.parse(['1'])'''
 
-    '''def test_validate_relative_file_path_true(self):
-        self.assertTrue(uptimes_calculator.validate('asdf/input_1.txt'))
+    # --- calculate_station_uptimes() tests ---
 
-    def test_validate_invalid_file_path_false(self):
-        self.assertFalse(uptimes_calculator.validate('!@#$'))'''
+
+    def test__calculate_station_uptimes__realistic_input__correct_uptimes(self):
+        chargers_to_stations = {1001: 0, 1002: 0, 1003: 1, 1004: 2}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1001, 50000, 100000, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 100000, True),
+                           uptimes_calculator.ChargerReport(1003, 25000, 75000, False),
+                           uptimes_calculator.ChargerReport(1004, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1004, 100000, 200000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100), (1, 0), (2, 75)])
+
+    def test__calculate_station_uptimes__timeline_in_negative_range__correct_uptimes(self):
+        chargers_to_stations = {1001: 0}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, -50000, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+
+    # --- --- All variations of the start and end times of the timelines between two concurrent sorted reports --- ---
+
+
+    def test__calculate_station_uptimes__two_equal_non_existent_report_timelines__only_affect_latest_and_earliest_times(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 0, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 0, True),
+                           # Prevents timeline error
+                           uptimes_calculator.ChargerReport(1001, 50000, 100000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 50)])
+
+    def test__calculate_station_uptimes__second_report_timeline_has_same_start_time_as_first_non_existent_report_timeline__first_report_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 0, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 25000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__non_existent_report_timeline_after_another_non_existent_timeline__only_affect_latest_and_earliest_times(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 0, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 25000, True),
+                           # Prevents timeline error
+                           uptimes_calculator.ChargerReport(1001, 50000, 100000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 50)])
+
+    def test__calculate_station_uptimes__second_report_timeline_after_non_existent_timeline__first_timeline_only_affects_latest_and_earliest_times(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 0, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 50)])
+
+    def test__calculate_station_uptimes__non_existent_report_timeline_at_start_of_previous_timeline__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 0, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_has_same_start_time_as_first_and_ends_inside_first__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 25000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__two_equal_report_timelines__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_has_same_start_as_first_but_ends_past_first__second_timeline_partially_adds_to_uptime(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 25000, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__non_existent_report_timeline_inside_previous_timeline__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 25000, 25000, True),
+                           uptimes_calculator.ChargerReport(1002, 0, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_inside_previous_timeline__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 75000, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_starts_inside_previous_timeline_and_ends_at_same_time_as_previous__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_starts_inside_previous_timeline_and_ends_past_previous_timeline__second_timeline_partially_adds_to_uptime(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 25000, 75000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__non_existent_report_timeline_at_end_of_previous_timeline__second_timeline_doesnt_affect_calculations(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 50000, 50000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__second_report_timeline_starts_at_end_of_previous_timeline__second_timeline_fully_adds_to_uptime(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 50000, 75000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 100)])
+
+    def test__calculate_station_uptimes__non_existent_report_timeline_past_end_of_previous_timeline__only_affect_latest_and_earliest_times(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 75000, 75000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 66)])
+
+    def test__calculate_station_uptimes__second_report_timeline_starts_past_end_of_previous_timeline__second_timeline_fully_adds_to_uptime(self):
+        chargers_to_stations = {1001: 0, 1002: 0}
+
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True),
+                           uptimes_calculator.ChargerReport(1002, 75000, 100000, True)]
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 75)])
+
+
+    # --- --- Bad data --- ---
+
+
+    def test__calculate_station_uptimes__no_charger_reports__zero_uptime(self):
+        chargers_to_stations = {1001: 0, 1002: 0, 1003: 1, 1004: 2}
+        charger_reports = []
+
+        uptimes = uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+        self.assertEqual(uptimes, [(0, 0), (1, 0), (2, 0)])
+
+    def test__calculate_station_uptimes__no_stations__key_error(self):
+        no_chargers_to_stations = {}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True)]
+
+        with self.assertRaises(KeyError):
+            uptimes_calculator.calculate_station_uptimes(no_chargers_to_stations, charger_reports)
+
+    def test__calculate_station_uptimes__no_station_associated_with_reports_charger_id__key_error(self):
+        chargers_to_stations = {1003: 3}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 0, 50000, True)]
+
+        with self.assertRaises(KeyError):
+            uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+    
+    def test__calculate_station_uptimes__station_timeline_does_not_exist__raise_timeline_error(self):
+        chargers_to_stations = {1001: 1}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 50000, 50000, True)]
+        
+        with self.assertRaises(uptimes_calculator.TimeLineError):
+            uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+
+    def test__calculate_station_uptimes__inverted_timeline__raise_timeline_error(self):
+        chargers_to_stations = {1001: 1}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 50000, -25000, True)]
+        
+        with self.assertRaises(uptimes_calculator.TimeLineError):
+            uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+
+    def test__calculate_station_uptimes__infinite_timeline_start__raise_timeline_error(self):
+        chargers_to_stations = {1001: 1}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, float('-inf'), 1, True)]
+        
+        with self.assertRaises(uptimes_calculator.TimeLineError):
+            uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+
+    def test__calculate_station_uptimes__infinite_timeline_end__raise_timeline_error(self):
+        chargers_to_stations = {1001: 1}
+        charger_reports = [uptimes_calculator.ChargerReport(1001, 1, float('-inf'), True)]
+        
+        with self.assertRaises(uptimes_calculator.TimeLineError):
+            uptimes_calculator.calculate_station_uptimes(chargers_to_stations, charger_reports)
+
 
 if __name__ == '__main__':
     unittest.main()
