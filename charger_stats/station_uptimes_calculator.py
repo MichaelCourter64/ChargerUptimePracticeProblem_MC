@@ -20,7 +20,6 @@ class StationUptimeCalculationState:
     calculation_time: int
     available_time: int
 
-def parse(arguments: List[str]):
 class NoStationsSectionError(Exception):
     pass
 class EmptyStationsSectionError(Exception):
@@ -63,6 +62,7 @@ class TimeLineError(Exception):
         message = f'The timeline of the report with id={charger_id}, is infinite: start={start_time}, end={end_time}'
         return cls(message, *args)
 
+def parse(cli_arguments: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Calculate station uptimes.')
 
     reports_path = 'reports_file_path'
