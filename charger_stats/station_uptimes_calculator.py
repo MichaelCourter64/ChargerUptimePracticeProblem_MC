@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 import math
 import sys
-import traceback
 from typing import Dict, List
 
 @dataclass
