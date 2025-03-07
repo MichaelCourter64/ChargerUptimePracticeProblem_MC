@@ -9,8 +9,8 @@ import charger_stats.station_uptimes_calculator as uptimes_calculator
 # The importance of prepended/appended double underscores in Python was a 
 # consideration when choosing the above format.
 
-class Test_StationUptimesCalculator(unittest.TestCase):
     universal_std_error_message = 'ERROR\n'
+class Test_Unit_StationUptimesCalculator(unittest.TestCase):
     valid_path = 'test/input_1.txt'
 
 
