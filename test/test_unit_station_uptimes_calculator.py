@@ -17,6 +17,11 @@ class Test_Unit_StationUptimesCalculator(unittest.TestCase):
     def test__parse__charger_uptime_reports_file_path__success(self):
         parsed_arguments = uptimes_calculator.parse([self.valid_path])
         self.assertEqual(parsed_arguments.reports_file_path, self.valid_path)
+
+    def test__parse__invalid_file_path__doesnt_check_so_success(self):
+        parsed_args = uptimes_calculator.parse([self.invalid_path])
+
+        self.assertEqual(parsed_args.reports_file_path, self.invalid_path)
     
     @patch('sys.stderr', new_callable=StringIO)
     def test__parse__missing_file_path_argument__system_exit_and_print_arg_info(self, mock_stderr):
