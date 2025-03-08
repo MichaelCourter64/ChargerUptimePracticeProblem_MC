@@ -14,6 +14,9 @@ class Test_Unit_StationUptimesCalculator(unittest.TestCase):
     invalid_path = '12(3'
 
 
+    # --- parse() tests ---
+
+
     def test__parse__charger_uptime_reports_file_path__success(self):
         parsed_arguments = uptimes_calculator.parse([self.valid_path])
         self.assertEqual(parsed_arguments.reports_file_path, self.valid_path)
@@ -54,6 +57,9 @@ class Test_Unit_StationUptimesCalculator(unittest.TestCase):
 
         self.assertIn('[-h] reports_file_path', err_message_lines[0])
         self.assertIn(f'error: unrecognized arguments: {extra_argument}', err_message_lines[1])
+
+
+    # --- parse_charger_text_reports() tests ---
 
     def test__parse_charger_text_reports__realistic_input__success(self):
         with open(self.valid_path, 'r') as file:
@@ -174,6 +180,10 @@ class Test_Unit_StationUptimesCalculator(unittest.TestCase):
 
         with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
             uptimes_calculator.parse_charger_text_reports(lines)
+
+
+    # --- validate_station_ids_in_reports() tests ---
+
 
     def test__validate_station_ids_in_reports__correct_input__valid_and_empty_id_list(self):
         chargers_to_stations = {1001: 0, 1003: 1}
