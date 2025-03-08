@@ -9,9 +9,9 @@ import charger_stats.station_uptimes_calculator as uptimes_calculator
 # The importance of prepended/appended double underscores in Python was a 
 # consideration when choosing the above format.
 
-    universal_std_error_message = 'ERROR\n'
 class Test_Unit_StationUptimesCalculator(unittest.TestCase):
     valid_path = 'test/input_1.txt'
+    invalid_path = '12(3'
 
 
     def test__parse__charger_uptime_reports_file_path__success(self):
@@ -19,41 +19,155 @@ class Test_Unit_StationUptimesCalculator(unittest.TestCase):
         self.assertEqual(parsed_arguments.reports_file_path, self.valid_path)
     
     @patch('sys.stderr', new_callable=StringIO)
-    @patch('sys.stdout', new_callable=StringIO)
-    def test__parse__missing_file_path_argument__log_and_exit(self, mock_stdout, mock_stderr):
+    def test__parse__missing_file_path_argument__system_exit_and_print_arg_info(self, mock_stderr):
         with self.assertRaises(SystemExit):
             uptimes_calculator.parse([])
 
-        out_message = mock_stdout.getvalue()
         err_message_lines = mock_stderr.getvalue().splitlines()
-
-        self.assertEqual(out_message, self.universal_std_error_message)
         self.assertIn('[-h] reports_file_path', err_message_lines[0])
         self.assertIn('error: the following arguments are required: reports_file_path', err_message_lines[1])
 
     @patch('sys.stderr', new_callable=StringIO)
-    @patch('sys.stdout', new_callable=StringIO)
-    def test__parse__too_many_arguments__log_and_exit(self, mock_stdout, mock_stderr):
-        with self.assertRaises(SystemExit):
-            uptimes_calculator.parse([self.valid_path, '--test'])
+    def test__parse__extra_positional_argument__system_exit_and_print_arg_info(self, mock_stderr):
+        extra_argument = '123'
 
-        self.assertEqual(mock_stdout.getvalue(), self.universal_std_error_message)
+        with self.assertRaises(SystemExit):
+            uptimes_calculator.parse([self.valid_path, extra_argument])
+
+        err_message_lines = mock_stderr.getvalue().splitlines()
+        self.assertIn('[-h] reports_file_path', err_message_lines[0])
+        self.assertIn(f'error: unrecognized arguments: {extra_argument}', err_message_lines[1])
 
     @patch('sys.stderr', new_callable=StringIO)
-    def test__parse_charger_text_reports__missing_stations_section__error(self, mock_stderr):
-        with open('test/input_missing_stations.txt', 'r') as file:
-            lines = file.readlines()
+    def test__parse__undefined_option_argument__system_exit_and_print_arg_info(self, mock_stderr):
+        extra_argument = '--test'
 
         with self.assertRaises(SystemExit):
-            uptimes_calculator.parse_charger_text_reports(lines)
+            uptimes_calculator.parse([self.valid_path, extra_argument])
 
-        self.assertEqual(mock_stderr.getvalue(), 'Error: [Stations] section not found in report text.\n')
+        err_message_lines = mock_stderr.getvalue().splitlines()
 
-    def test__parse_charger_text_reports__missing_charger_availability_reports_section__error(self):
-        with open('test/input_missing_charger_reports.txt', 'r') as file:
+        self.assertIn('[-h] reports_file_path', err_message_lines[0])
+        self.assertIn(f'error: unrecognized arguments: {extra_argument}', err_message_lines[1])
+
+    def test__parse_charger_text_reports__realistic_input__success(self):
+        with open(self.valid_path, 'r') as file:
             lines = file.readlines()
 
-        with self.assertRaises(SystemExit):                
+        chargers_to_stations, charger_reports = uptimes_calculator.parse_charger_text_reports(lines)
+
+        self.assertEqual(chargers_to_stations, {1001: 0, 1002: 0, 1003: 1, 1004: 2})
+        self.assertEqual(charger_reports, [uptimes_calculator.ChargerReport(1001, 0, 50000, True), 
+                                           uptimes_calculator.ChargerReport(1001, 50000, 100000, True), 
+                                           uptimes_calculator.ChargerReport(1002, 50000, 100000, True), 
+                                           uptimes_calculator.ChargerReport(1003, 25000, 75000, False), 
+                                           uptimes_calculator.ChargerReport(1004, 0, 50000, True), 
+                                           uptimes_calculator.ChargerReport(1004, 100000, 200000, True)])
+
+    def test__parse_charger_text_reports__negative_time_stamp__success(self):
+        with open('test/data_test_files/input_negative_time.txt', 'r') as file:
+            lines = file.readlines()
+
+        chargers_to_stations, charger_reports = uptimes_calculator.parse_charger_text_reports(lines)
+
+        self.assertEqual(chargers_to_stations, {1001: 0})
+        self.assertEqual(charger_reports, [uptimes_calculator.ChargerReport(1001, -25000, 50000, True)])
+
+    def test__parse_charger_text_reports__missing_a_station_id_field__cant_check_so_success(self):
+        with open('test/data_test_files/input_missing_station_id.txt', 'r') as file:
+            lines = file.readlines()
+
+        chargers_to_stations, _ = uptimes_calculator.parse_charger_text_reports(lines)
+
+        self.assertEqual(chargers_to_stations, {1002: 1001, 1003: 1})
+
+    def test__parse_charger_text_reports__missing_stations_section__raise_stations_section_error(self):
+        with open('test/data_test_files/input_missing_stations.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.NoStationsSectionError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__missing_charger_availability_reports_section__raise_charger_reports_section_error(self):
+        with open('test/data_test_files/input_missing_charger_reports.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.NoChargerReportsSectionError):                
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__missing_stations_and_charger_reports_section__raise_stations_section_error(self):
+        with open('test/data_test_files/input_missing_both_sections.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.NoStationsSectionError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__empty_stations_section__raise_empty_stations_section_error(self):
+        with open('test/data_test_files/input_empty_stations_section.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.EmptyStationsSectionError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__empty_charger_reports_section__raise_empty_charger_reports_section_error(self):
+        with open('test/data_test_files/input_empty_charger_reports_section.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.EmptyChargerReportsSectionError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__empty_list__raise_stations_section_error(self):
+        with self.assertRaises(uptimes_calculator.NoStationsSectionError):
+            uptimes_calculator.parse_charger_text_reports([])
+
+    def test__parse_charger_text_reports__no_empty_lines_between_sections__raise_invalid_value_error(self):
+        with open('test/data_test_files/input_no_empty_lines_between_sections.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__no_new_lines_in_file__raise_stations_section_error(self):
+        with open('test/data_test_files/input_no_new_lines.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.NoStationsSectionError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__invalid_station_number_data__raise_invalid_value_error(self):
+        with open('test/data_test_files/input_bad_station_data.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__invalid_charger_reports_number_data__raise_invalid_value_error(self):
+        with open('test/data_test_files/input_bad_charger_report_data.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__invalid_charger_reports_bool_data__attribute_set_to_false(self):
+        with open('test/data_test_files/input_bad_charger_report_bool_data.txt', 'r') as file:
+            lines = file.readlines()
+
+        _, charger_reports = uptimes_calculator.parse_charger_text_reports(lines)
+
+        self.assertEqual(charger_reports[0].charger_available, False)
+
+    def test__parse_charger_text_reports__charger_report_missing_station_id__raise_invalid_value_error(self):
+        with open('test/data_test_files/input_charger_report_missing_station_id.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
+            uptimes_calculator.parse_charger_text_reports(lines)
+
+    def test__parse_charger_text_reports__charger_report_missing_time__raise_invalid_value_error(self):
+        with open('test/data_test_files/input_charger_report_missing_time.txt', 'r') as file:
+            lines = file.readlines()
+
+        with self.assertRaises(uptimes_calculator.InvalidChargerReportValueError):
             uptimes_calculator.parse_charger_text_reports(lines)
 
     def test__validate_station_ids_in_reports__correct_input__valid_and_empty_id_list(self):

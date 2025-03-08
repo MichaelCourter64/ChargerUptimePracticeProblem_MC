@@ -71,11 +71,7 @@ def parse(cli_arguments: List[str]) -> argparse.Namespace:
                         type=str,
                         help='Path to charger uptime reports file. <file format requirements here>')
 
-    try:
-        parsed_arguments = parser.parse_args(arguments)
-    except SystemExit as s:
-        print('ERROR')
-        raise s
+    parsed_arguments = parser.parse_args(cli_arguments)
 
     return parsed_arguments
 
@@ -232,32 +228,33 @@ def calculate_station_uptimes(chargers_to_stations: Dict[int, int], charger_repo
 
 def main():
     cli_arguments = sys.argv[1:]
-    parsed_arguments = parse(cli_arguments)
 
-    # Validate the file path
-    '''if not validate(parsed_arguments.reports_relative_file_path):
+    try:
+        parsed_arguments = parse(cli_arguments)
+    except SystemExit as s:
         print('ERROR')
-        print(f"Error: The report file path argument '{parsed_arguments.reports_relative_file_path}' is not a valid path.", file=sys.stderr)
-        sys.exit(1)'''
-
+        raise s
+    
     # Read all text from the file
     try:
         with open(parsed_arguments.reports_file_path, 'r') as file:
             lines = file.readlines()
-    except Exception as e:
+    except OSError as e:
+        print('ERROR')
+        # Requirements do not specify if exiting the program should be caused by a SystemExit exception
+        raise e
+
+    try:
+        chargers_to_stations, charger_reports = parse_charger_text_reports(lines)
+    except (Exception) as e:
         print('ERROR')
         raise e
 
-    chargers_to_stations, charger_reports = parse_charger_text_reports(lines)    
-
-    # Validate station ids in reports
-    station_ids_are_valid, missing_station_ids = validate_station_ids_in_reports(chargers_to_stations, charger_reports)
-    if not station_ids_are_valid:
-        print('ERROR')
-        print(f"Error: Station id's '{missing_station_ids}' not found in Station section.", file=sys.stderr)
-        sys.exit(1)
-
     uptimes = calculate_station_uptimes(chargers_to_stations, charger_reports)
+        uptimes = calculate_station_uptimes(chargers_to_stations, charger_reports)
+    except (TimeLineError) as e:
+        print('ERROR')
+        raise e
 
     station_sorted_uptimes = sorted(uptimes, key=lambda x: x[0])
 
