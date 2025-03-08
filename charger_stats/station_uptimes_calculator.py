@@ -250,7 +250,7 @@ def main():
         print('ERROR')
         raise e
 
-    uptimes = calculate_station_uptimes(chargers_to_stations, charger_reports)
+    try:
         uptimes = calculate_station_uptimes(chargers_to_stations, charger_reports)
     except (TimeLineError) as e:
         print('ERROR')
