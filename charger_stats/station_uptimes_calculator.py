@@ -63,6 +63,17 @@ class TimeLineError(Exception):
         return cls(message, *args)
 
 def parse(cli_arguments: List[str]) -> argparse.Namespace:
+    """
+    Parses command line arguments to get the string representing the path to charger uptime reports. 
+       
+    Does not ensure the string is a valid path to a file.
+    
+    Returns:
+        argparse.Namespace: Guaranteed to have a string attribute named reports_file_path.
+    Raises:
+        SystemExit: Arguments were invalid or didn't match expected format.
+    """
+
     parser = argparse.ArgumentParser(description='Calculate station uptimes.')
 
     reports_path = 'reports_file_path'
@@ -76,7 +87,39 @@ def parse(cli_arguments: List[str]) -> argparse.Namespace:
     return parsed_arguments
 
 def parse_charger_text_reports(text_lines: List[str]) -> tuple[Dict[int, int], List[ChargerReport]]:
+    """
+    Parses text_lines to create a map of charger ids to station ids and a list of charger reports.
     
+    Sections must be separated by empty lines.
+
+    Invalid charger availability bool values will not raise an error.
+
+    Example input text:
+        [Stations]
+        0 1001 1002
+
+        [Charger Availability Reports]
+        1001 0 50000 true
+        1001 50000 100000 true
+        1002 50000 100000 true
+
+    Args:
+        text_lines (List[str]): Represents stations and charger availability reports.
+    
+    Returns:
+        (Dict[int, int], List[ChargerReport]): 
+            A map of charger ids to station ids.
+        
+            A list of charger report instances.
+    
+    Raises:
+        NoStationsSectionError: [Stations] section not found in report text.
+        NoChargerReportsSectionError: [Charger Availability Reports] section not found in report text.
+        InvalidChargerReportValueError: Some value in the reports wasn't a valid integer.
+        EmptyStationsSectionError: [Stations] section is empty.
+        EmptyChargerReportsSectionError: [Charger Availability Reports] section is empty.
+    """
+
     chargers_to_stations: Dict[int, int] = {}
     charger_reports: List[ChargerReport] = []
     
