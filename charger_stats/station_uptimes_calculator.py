@@ -122,15 +122,17 @@ def parse_charger_text_reports(text_lines: List[str]) -> tuple[Dict[int, int], L
 
     chargers_to_stations: Dict[int, int] = {}
     charger_reports: List[ChargerReport] = []
-    
+
     try:
         # Find index of the line containing '[Stations]' using generator expression
         station_section_index = next(i for i, line in enumerate(text_lines) if '[Stations]\n' == line)
     except StopIteration:
         raise NoStationsSectionError
     
+    # Iterate through '[Stations]' section and map chargers_to_stations
     line_index = station_section_index + 1
     while line_index < len(text_lines) and not text_lines[line_index].isspace():
+        
         station_entry_list = text_lines[line_index].split()
 
         try:
@@ -152,12 +154,15 @@ def parse_charger_text_reports(text_lines: List[str]) -> tuple[Dict[int, int], L
         raise EmptyStationsSectionError
 
     try:
+        # Find index of the line containing '[Charger Availability Reports]' using generator expression
         charger_section_index = next(i for i, line in enumerate(text_lines) if '[Charger Availability Reports]\n' == line)
     except StopIteration:
         raise NoChargerReportsSectionError
     
+    # Iterate through '[Charger Availability Reports]' section and create charger_reports entries
     line_index = charger_section_index + 1
     while line_index < len(text_lines) and not text_lines[line_index].isspace():
+
         charger_entry_list = text_lines[line_index].split()
 
         try:
