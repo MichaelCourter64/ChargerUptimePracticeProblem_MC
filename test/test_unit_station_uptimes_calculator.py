@@ -8,6 +8,9 @@ import charger_stats.station_uptimes_calculator as uptimes_calculator
 #
 # The importance of prepended/appended double underscores in Python was a 
 # consideration when choosing the above format.
+#
+# If use of real text files for testing is an issue in the future, consider 
+# using patch()'s side_effect parameter with mock open().
 
 class Test_Unit_StationUptimesCalculator(unittest.TestCase):
     valid_path = 'test/input_1.txt'
